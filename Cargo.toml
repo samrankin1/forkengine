@@ -1,0 +1,6 @@
+[package]
+name = "forkengine"
+version = "0.1.0"
+authors = ["Sam Rankin"]
+
+[dependencies]
