@@ -209,9 +209,10 @@ impl Runtime {
 
 			if let Some(runtime_result) = result {
 				if runtime_result.is_ok() {
-					snapshots.push(RuntimeSnapshot::new(&self, true, runtime_result.ok().unwrap()));
+					snapshots.push(RuntimeSnapshot::new(&self, false, runtime_result.ok().unwrap()));
 				} else {
-					snapshots.push(RuntimeSnapshot::new(&self, false, runtime_result.err().unwrap()));
+					snapshots.push(RuntimeSnapshot::new(&self, true, runtime_result.err().unwrap()));
+					break; // all errors are fatal
 				}
 			}
 
