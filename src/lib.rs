@@ -65,7 +65,7 @@ impl Runtime {
 	}
 
 	fn expand_memory(&mut self) {
-		let additional = self.memory.capacity() / 2; // reserve 50% of the current capacity more
+		let additional = (self.memory.capacity() / 2) + 1; // reserve 50% of the current capacity more
 		self.memory.reserve_exact(additional);
 
 		// TODO assert: self.memory_pointer == memory.capacity()
