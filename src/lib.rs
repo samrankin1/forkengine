@@ -42,7 +42,7 @@ impl RuntimeSnapshot {
 
 pub struct RuntimeProduct {
 	pub snapshots: Vec<RuntimeSnapshot>,
-	pub output: Vec<u8>,
+	pub output: Vec<u8>
 }
 
 type RuntimeResult = Result<&'static str, &'static str>;
@@ -57,7 +57,7 @@ impl Runtime {
 			input: input,
 			input_pointer: 0,
 
-			memory: vec![0; 4],
+			memory: vec![0; 1],
 			memory_pointer: 0,
 
 			output: Vec::new()
