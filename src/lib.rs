@@ -25,9 +25,9 @@ pub struct RuntimeSnapshot {
 
 impl RuntimeSnapshot {
 
-	fn new(runtime: &Runtime, is_error: bool, message: &'static str) -> RuntimeSnapshot {
+	fn new(runtime: &Runtime, memory_pointer_max: usize, is_error: bool, message: &'static str) -> RuntimeSnapshot {
 		RuntimeSnapshot {
-			memory: runtime.memory.to_vec(),
+			memory: (&runtime.memory[..(memory_pointer_max + 1)]).to_vec(),
 			memory_pointer: runtime.memory_pointer,
 			instruction_pointer: runtime.instruction_pointer,
 			input_pointer: runtime.input_pointer,
@@ -191,12 +191,18 @@ impl Runtime {
 
 	pub fn run(&mut self) -> RuntimeProduct {
 		let mut snapshots: Vec<RuntimeSnapshot> = Vec::new();
+		let mut memory_pointer_max: usize = 0;
 
 		while self.instruction_pointer < self.instructions.len() {
 
 			let mut result: Option<RuntimeResult> = None;
 			match self.instructions.chars().nth(self.instruction_pointer).unwrap() {
-				'>' => result = Some(self.increment_pointer()),
+				'>' => {
+					result = Some(self.increment_pointer());
+					if self.memory_pointer > memory_pointer_max {
+						memory_pointer_max = self.memory_pointer;
+					}
+				},
 				'<' => result = Some(self.decrement_pointer()),
 				'+' => result = Some(self.increment_byte()),
 				'-' => result = Some(self.decrement_byte()),
@@ -209,9 +215,9 @@ impl Runtime {
 
 			if let Some(runtime_result) = result {
 				if runtime_result.is_ok() {
-					snapshots.push(RuntimeSnapshot::new(&self, false, runtime_result.ok().unwrap()));
+					snapshots.push(RuntimeSnapshot::new(&self, memory_pointer_max, false, runtime_result.ok().unwrap()));
 				} else {
-					snapshots.push(RuntimeSnapshot::new(&self, true, runtime_result.err().unwrap()));
+					snapshots.push(RuntimeSnapshot::new(&self, memory_pointer_max, true, runtime_result.err().unwrap()));
 					break; // all errors are fatal
 				}
 			}
