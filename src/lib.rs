@@ -29,19 +29,19 @@ impl RuntimeSnapshot {
 }
 
 pub struct RuntimeProduct {
-	pub snapshots: Vec<RuntimeSnapshot>,
-	pub output: Vec<u8>,
 	pub executions: usize,
-	pub time: u64
+	pub time: u64,
+	pub output: Vec<u8>,
+	pub snapshots: Vec<RuntimeSnapshot>
 }
 
 impl RuntimeProduct {
-	fn new(snapshots: Vec<RuntimeSnapshot>, output: Vec<u8>, executions: usize, time: u64) -> RuntimeProduct {
+	fn new(executions: usize, time: u64, output: Vec<u8>, snapshots: Vec<RuntimeSnapshot>) -> RuntimeProduct {
 		RuntimeProduct {
-			snapshots: snapshots,
-			output: output,
 			executions: executions,
-			time: time
+			time: time,
+			output: output,
+			snapshots: snapshots
 		}
 	}
 }
@@ -231,7 +231,7 @@ impl Runtime {
 				snapshots.push(RuntimeSnapshot::new(&self, memory_pointer_max, true, "execution terminated by engine (instruction limit exceeded)"));
 
 				let executions = snapshots.len() - 1;
-				return RuntimeProduct::new(snapshots, self.output.clone(), executions, (time::precise_time_ns() - start)); // return early, subtract one from execution count to account for refusal message
+				return RuntimeProduct::new(executions, (time::precise_time_ns() - start), self.output.clone(), snapshots); // return early, subtract one from execution count to account for refusal message
 			}
 
 			let mut result: Option<RuntimeResult> = None;
@@ -265,7 +265,7 @@ impl Runtime {
 		}
 
 		let executions = snapshots.len();
-		RuntimeProduct::new(snapshots, self.output.clone(), executions, (time::precise_time_ns() - start))
+		RuntimeProduct::new(executions, (time::precise_time_ns() - start), self.output.clone(), snapshots)
 	}
 
 }
