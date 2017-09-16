@@ -1,16 +1,4 @@
-
-pub struct Runtime {
-	instructions: String,
-	instruction_pointer: usize,
-
-	input: Vec<u8>,
-	input_pointer: usize,
-
-	memory: Vec<u8>,
-	memory_pointer: usize,
-
-	output: Vec<u8>
-}
+extern crate time;
 
 pub struct RuntimeSnapshot {
 	pub memory: Vec<u8>,
@@ -42,14 +30,47 @@ impl RuntimeSnapshot {
 
 pub struct RuntimeProduct {
 	pub snapshots: Vec<RuntimeSnapshot>,
-	pub output: Vec<u8>
+	pub output: Vec<u8>,
+	pub executions: usize,
+	pub time: u64
+}
+
+impl RuntimeProduct {
+	fn new(snapshots: Vec<RuntimeSnapshot>, output: Vec<u8>, executions: usize, time: u64) -> RuntimeProduct {
+		RuntimeProduct {
+			snapshots: snapshots,
+			output: output,
+			executions: executions,
+			time: time
+		}
+	}
 }
 
 type RuntimeResult = Result<&'static str, &'static str>;
 
+pub struct Runtime {
+	instructions: String,
+	instruction_pointer: usize,
+
+	input: Vec<u8>,
+	input_pointer: usize,
+
+	memory: Vec<u8>,
+	memory_pointer: usize,
+
+	output: Vec<u8>,
+
+	execution_limit: usize,
+	memory_limit: usize
+}
+
 impl Runtime {
 
 	pub fn new(instructions: String, input: Vec<u8>) -> Runtime {
+		Runtime::with_limits(instructions, input, 0, 0) // forward call with limits as 0, indicating infinite
+	}
+
+	pub fn with_limits(instructions: String, input: Vec<u8>, execution_limit: usize, memory_limit: usize) -> Runtime {
 		Runtime {
 			instructions: instructions,
 			instruction_pointer: 0,
@@ -60,16 +81,22 @@ impl Runtime {
 			memory: vec![0; 1],
 			memory_pointer: 0,
 
-			output: Vec::new()
+			output: Vec::new(),
+
+			execution_limit: execution_limit,
+			memory_limit: memory_limit
 		}
 	}
 
-	fn expand_memory(&mut self) {
-		let additional = (self.memory.capacity() / 2) + 1; // reserve 50% of the current capacity more
-		self.memory.reserve_exact(additional);
+	fn expand_memory(&mut self) -> usize {
+		let mut additional = (self.memory.capacity() / 2) + 1; // try to reserve 50% of the current capacity more plus one
+		if (self.memory_limit > 0) && ((self.memory.capacity() + additional) > self.memory_limit) {
+			additional = self.memory_limit - self.memory.capacity();
+		}
 
-		// TODO assert: self.memory_pointer == memory.capacity()
+		self.memory.reserve_exact(additional);
 		self.memory.extend(vec![0; additional]);
+		additional
 	}
 
 	fn next_input_byte(&mut self) -> u8 {
@@ -86,7 +113,9 @@ impl Runtime {
 		// ensure capacity
 		if (self.memory_pointer + 1) >= self.memory.capacity() {
 			// TODO: memory limit check?
-			self.expand_memory();
+			if self.expand_memory() == 0 {
+				return Err("failed to increment pointer (runtime memory limit exceeded)");
+			}
 		}
 
 		self.memory_pointer += 1; // increment the pointer
@@ -94,7 +123,7 @@ impl Runtime {
 	}
 
 	fn decrement_pointer(&mut self) -> RuntimeResult {
-		if self.memory_pointer <= 0 { // can't decrement to below zero
+		if self.memory_pointer == 0 { // can't decrement to below zero
 			return Err("can't decrement pointer sub-0!");
 		}
 
@@ -190,10 +219,20 @@ impl Runtime {
 	}
 
 	pub fn run(&mut self) -> RuntimeProduct {
+		let start = time::precise_time_ns(); // start the stopwatch
+
 		let mut snapshots: Vec<RuntimeSnapshot> = Vec::new();
 		let mut memory_pointer_max: usize = 0;
 
 		while self.instruction_pointer < self.instructions.len() {
+
+			// if the maximum number of instructions have already been stored
+			if (self.execution_limit > 0) && (snapshots.len() >= self.execution_limit) {
+				snapshots.push(RuntimeSnapshot::new(&self, memory_pointer_max, true, "execution terminated by engine (instruction limit exceeded)"));
+
+				let executions = snapshots.len() - 1;
+				return RuntimeProduct::new(snapshots, self.output.clone(), executions, (time::precise_time_ns() - start)); // return early, subtract one from execution count to account for refusal message
+			}
 
 			let mut result: Option<RuntimeResult> = None;
 			match self.instructions.chars().nth(self.instruction_pointer).unwrap() {
@@ -225,10 +264,8 @@ impl Runtime {
 			self.instruction_pointer += 1;
 		}
 
-		RuntimeProduct {
-			snapshots: snapshots,
-			output: self.output.clone()
-		}
+		let executions = snapshots.len();
+		RuntimeProduct::new(snapshots, self.output.clone(), executions, (time::precise_time_ns() - start))
 	}
 
 }
